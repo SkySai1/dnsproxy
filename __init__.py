@@ -37,7 +37,7 @@ def t_handle(conn, data, addr):
     if addr[0] == '95.165.134.11':
         answer = t_sender(data, ('77.73.132.32', 53))
         #print(DNSRecord.parse(answer))
-        t_back(s, answer, addr)
+        t_back(conn, answer, addr)
 
     elif addr[0] == '77.73.132.32':
         answer = t_sender(data, ('95.165.134.11', 53))
