@@ -28,21 +28,21 @@ def handle(s, data, addr):
 
     elif addr[0] == '77.73.132.32':
         answer = sender(data, ('95.165.134.11', 53))
+        #print(addr)
         #print(DNSRecord.parse(answer))
         back(s, answer, addr)
 
 #TCP SOCK
 
 def t_handle(conn, data, addr):
-    if addr[0] == '95.165.134.11':
-        answer = t_sender(data, ('77.73.132.32', 53))
+    if addr[0] == '95.165.134.11': ip = '77.73.132.32'
+    elif addr[0] == '77.73.132.32': ip = '95.165.134.11'
+    if ip:
+        answer = t_sender(data, (ip, 53))
         #print(DNSRecord.parse(answer))
         t_back(conn, answer, addr)
 
-    elif addr[0] == '77.73.132.32':
-        answer = t_sender(data, ('95.165.134.11', 53))
-        #print(DNSRecord.parse(answer))
-        t_back(conn, answer, addr)   
+    
 
 def t_sender(data, addr):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -54,8 +54,11 @@ def t_sender(data, addr):
 
 def t_back(conn, data, addr):
     conn.sendto(data, addr)
-    #answer, _ = conn.recv(16384)
-    conn.close()
+    try: 
+        answer, _ = conn.recv(16384)
+        return answer
+    except: conn.close()
+    
 
 def udpsock(ip, port):
     while True:
@@ -71,14 +74,11 @@ def tcpsock(ip, port):
     tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_address = (ip, port)
     tcp.bind(server_address)
-    tcp.listen(1)
     while True:
+        tcp.listen(0)
         conn, addr = tcp.accept()
         data = conn.recv(16384)
-        #print(conn)
-        t_handle(conn, data, addr)
-        try: print(DNSRecord.parse(data))
-        except: pass
+        if data: t_handle(conn, data, addr)
 
 def Parallel(data):
     proc = []
