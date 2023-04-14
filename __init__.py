@@ -32,6 +32,7 @@ def handle(s, data, addr):
         #print(DNSRecord.parse(answer))
         back(s, answer, addr)
 
+
 #TCP SOCK
 
 def t_handle(conn, data, addr):
