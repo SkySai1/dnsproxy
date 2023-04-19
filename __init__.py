@@ -15,20 +15,15 @@ ip1 = '95.165.134.11'
 ip2 = '192.168.1.12'
 
 #UDP SOCK
-def sender(data, addr):
+def query(data, addr):
     send = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    send.settimeout(1)
     send.sendto(data, addr)
-    answer, addr = receive(send)
+    try:
+        answer, addr = send.recvfrom(512)
+    except:
+        answer = ''.encode('utf-8')
     send.close()
-    if not answer: answer = ''.encode('utf-8')
-    return answer
-
-
-def back(udp, data, addr):
-    #udp.settimeout(1)
-    udp.sendto(data, addr)
-    try: answer, addr = receive(udp)
-    except: answer = None
     return answer
 
 def handle(udp, data, addr):
@@ -36,34 +31,15 @@ def handle(udp, data, addr):
     elif addr[0] == ip2: ip = ip1
     else: ip = None
     if ip:
-        print(f'\nto {ip}: {DNSRecord.parse(data).questions}')
-        answer = sender(data, (ip, 53))
-        
-        print(f'from {ip}: {DNSRecord.parse(answer).rr}')
-        if answer: back(udp, answer, addr)
-
-
-def receive(udp): 
-    #udp.settimeout(2) # TimeOut
-    while True:
-        try:
-            data, addres = udp.recvfrom(512)
-        except Exception as e:
-            print(e)
-            data = ''   # Если ни каких данных не пришло, возвращаем пустые данные
-            addres = ('', 0)
-            return data, addres
-        return data, addres
+        answer = query(data, (ip, 53))
+        udp.sendto(answer, addr)
 
 def udpsock(udp, ip, port):
     server_address = (ip, port)
     udp.bind(server_address)
     while True:
-        data, address = receive(udp) #udp.recvfrom(512)
-        #handle(udp, data, address)
-        threading.Thread(target=handle, args=(udp, data, address )).start()
-
-
+        data, address = udp.recvfrom(512) #receive(udp)
+        threading.Thread(target=handle, args=(udp, data, address)).start()
 
 #TCP SOCK
 
@@ -72,13 +48,10 @@ def t_handle(conn, data, addr):
     elif addr[0] == ip2: ip = ip1
     else: ip = None
     if ip:
-        print('\n',data)
         answer = t_sender(data, (ip, 53))
-        print('\n', answer)
-        t_back(conn, answer, addr)
+        conn.sendto(answer, addr)
 
     
-
 def t_sender(data, addr):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect(addr)
@@ -86,15 +59,7 @@ def t_sender(data, addr):
     answer, _ = s.recvfrom(16384)
     s.close()
     return answer
-
-def t_back(conn, data, addr):
-    conn.sendto(data, addr)
-    try: 
-        answer, _ = conn.recv(16384)
-        return answer
-    except: conn.close()
-    
-
+ 
 def tcpsock(tcp, ip, port):
     server_address = (ip, port)
     tcp.bind(server_address)
@@ -142,7 +107,7 @@ if __name__ == "__main__":
     port = 53      
     data = [
             {udpsock: [udp, ip, port]},
-            #{tcpsock: [tcp, ip, port]},
+            {tcpsock: [tcp, ip, port]},
             {quiter: ''}
         ]
     try:
