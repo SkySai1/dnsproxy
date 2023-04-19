@@ -2,45 +2,79 @@
 import socket
 import threading
 import sys
+import struct
+import os
+import queue
+import time
+import subprocess
 from dnslib import DNSRecord
 from multiprocessing import Process
+from scapy.all import *
+
+ip1 = '95.165.134.11'
+ip2 = '192.168.1.12'
 
 #UDP SOCK
 def sender(data, addr):
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.sendto(data, addr)
-    answer, _ = s.recvfrom(512)
-    s.close()
+    send = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    send.sendto(data, addr)
+    answer, addr = receive(send)
+    send.close()
+    if not answer: answer = ''.encode('utf-8')
     return answer
 
 
-def back(s, data, addr):
-    s.sendto(data, addr)
-    answer, _ = s.recvfrom(512)
-    s.close()
+def back(udp, data, addr):
+    #udp.settimeout(1)
+    udp.sendto(data, addr)
+    try: answer, addr = receive(udp)
+    except: answer = None
     return answer
 
-def handle(s, data, addr):
-    if addr[0] == '95.165.134.11':
-        answer = sender(data, ('77.73.132.32', 53))
-        #print(DNSRecord.parse(answer))
-        back(s, answer, addr)
+def handle(udp, data, addr):
+    if addr[0] == ip1: ip = ip2
+    elif addr[0] == ip2: ip = ip1
+    else: ip = None
+    if ip:
+        print(f'\nto {ip}: {DNSRecord.parse(data).questions}')
+        answer = sender(data, (ip, 53))
+        
+        print(f'from {ip}: {DNSRecord.parse(answer).rr}')
+        if answer: back(udp, answer, addr)
 
-    elif addr[0] == '77.73.132.32':
-        answer = sender(data, ('95.165.134.11', 53))
-        #print(addr)
-        #print(DNSRecord.parse(answer))
-        back(s, answer, addr)
+
+def receive(udp): 
+    #udp.settimeout(2) # TimeOut
+    while True:
+        try:
+            data, addres = udp.recvfrom(512)
+        except Exception as e:
+            print(e)
+            data = ''   # Если ни каких данных не пришло, возвращаем пустые данные
+            addres = ('', 0)
+            return data, addres
+        return data, addres
+
+def udpsock(udp, ip, port):
+    server_address = (ip, port)
+    udp.bind(server_address)
+    while True:
+        data, address = receive(udp) #udp.recvfrom(512)
+        #handle(udp, data, address)
+        threading.Thread(target=handle, args=(udp, data, address )).start()
+
 
 
 #TCP SOCK
 
 def t_handle(conn, data, addr):
-    if addr[0] == '95.165.134.11': ip = '77.73.132.32'
-    elif addr[0] == '77.73.132.32': ip = '95.165.134.11'
+    if addr[0] == ip1: ip = ip2
+    elif addr[0] == ip2: ip = ip1
+    else: ip = None
     if ip:
+        print('\n',data)
         answer = t_sender(data, (ip, 53))
-        #print(DNSRecord.parse(answer))
+        print('\n', answer)
         t_back(conn, answer, addr)
 
     
@@ -61,18 +95,7 @@ def t_back(conn, data, addr):
     except: conn.close()
     
 
-def udpsock(ip, port):
-    while True:
-        udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        server_address = (ip, port)
-        udp.bind(server_address)
-        data, address = udp.recvfrom(512)
-        handle(udp, data, address)
-        #threading.Thread(target=handle, args=(udp, data, address )).start()
-
-
-def tcpsock(ip, port):
-    tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+def tcpsock(tcp, ip, port):
     server_address = (ip, port)
     tcp.bind(server_address)
     while True:
@@ -80,6 +103,19 @@ def tcpsock(ip, port):
         conn, addr = tcp.accept()
         data = conn.recv(16384)
         if data: t_handle(conn, data, addr)
+
+### Основной Блок
+
+def quiter():
+    q = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    q.bind(('127.0.0.1', 5300))
+    while True:
+        try:
+            data, addres = q.recvfrom(1024)
+            if data.decode('utf-8') == 'quit':
+                subprocess.run(["killall", os.path.basename(__file__)])
+        except: pass
+
 
 def Parallel(data):
     proc = []
@@ -98,12 +134,20 @@ def Parallel(data):
 
 
 if __name__ == "__main__":
+    tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    with open('./pids', 'w+') as f:
+        f.write('')
     ip = '192.168.1.10'
-    port = 53        
+    port = 53      
     data = [
-            {udpsock: [ip, port]},
-            {tcpsock: [ip, port]}
+            {udpsock: [udp, ip, port]},
+            #{tcpsock: [tcp, ip, port]},
+            {quiter: ''}
         ]
-    Parallel(data)
+    try:
+        Parallel(data)
+    except KeyboardInterrupt:
+        subprocess.run(["killall", os.path.basename(__file__)])
 
 
