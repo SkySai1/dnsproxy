@@ -12,7 +12,7 @@ from multiprocessing import Process
 from scapy.all import *
 
 ip1 = '95.165.134.11'
-ip2 = '192.168.1.12'
+ip2 = '77.73.132.32'
 
 #UDP SOCK
 def query(data, addr):
@@ -33,7 +33,10 @@ def handle(udp, data, addr):
     if ip:
         answer = query(data, (ip, 53))
         udp.sendto(answer, addr)
-
+        try:
+            print(f"to {ip}: {DNSRecord.parse(data).questions}")
+            print(f"from {ip}: {DNSRecord.parse(answer).rr}")
+        except: pass
 def udpsock(udp, ip, port):
     server_address = (ip, port)
     udp.bind(server_address)
