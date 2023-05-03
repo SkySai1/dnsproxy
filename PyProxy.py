@@ -1,4 +1,5 @@
 #!./dns/bin/python3
+import logging
 import socket
 import threading
 import sys
@@ -9,7 +10,11 @@ import time
 import subprocess
 from dnslib import DNSRecord
 from multiprocessing import Process
+from decoder import Decoder
+from dns.query import *
 from scapy.all import *
+from scapy.layers.l2 import Ether
+from bitstring import BitArray
 
 ip1 = '95.165.134.11'
 ip2 = '77.73.132.32'
@@ -34,8 +39,10 @@ def handle(udp, data, addr):
         answer = query(data, (ip, 53))
         udp.sendto(answer, addr)
         try:
-            print(f"to {ip}: {DNSRecord.parse(data).questions}")
-            print(f"from {ip}: {DNSRecord.parse(answer).rr}")
+            print('--------------------------------------------')
+            print(f"to {ip}: {DNSRecord.parse(data)}")
+            print(f"from {ip}: {DNSRecord.parse(answer)}")
+            pass
         except: pass
 def udpsock(udp, ip, port):
     server_address = (ip, port)
@@ -53,24 +60,42 @@ def t_handle(conn, data, addr):
     if ip:
         answer = t_sender(data, (ip, 53))
         conn.sendto(answer, addr)
+        try:
+            print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+            print(f"to {ip}: {DNSRecord.parse(data[2:])}")
+            print(f"from {ip}: {DNSRecord.parse(answer[2:])}")
+            pass
+        except:
+            logging.exception('TCP')
+            pass
 
     
 def t_sender(data, addr):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect(addr)
     s.sendall(data)
-    answer, _ = s.recvfrom(16384)
+    s.settimeout(2)
+    answer = b''
+    packet = True
+    try:
+        while packet:
+            packet = s.recv(4096)
+            answer+=packet
+    except socket.timeout: pass
     s.close()
     return answer
  
 def tcpsock(tcp, ip, port):
     server_address = (ip, port)
     tcp.bind(server_address)
-    while True:
-        tcp.listen(0)
-        conn, addr = tcp.accept()
-        data = conn.recv(16384)
-        if data: t_handle(conn, data, addr)
+    try:
+        while True:
+            tcp.listen(3)
+            conn, addr = tcp.accept()
+            data = conn.recv(32768)
+            if data:
+                threading.Thread(target=t_handle, args=(conn, data, addr)).start()
+    except KeyboardInterrupt: tcp.close()
 
 ### Основной Блок
 
@@ -104,8 +129,6 @@ def Parallel(data):
 if __name__ == "__main__":
     tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    with open('./pids', 'w+') as f:
-        f.write('')
     ip = '192.168.1.10'
     port = 53      
     data = [
@@ -115,7 +138,12 @@ if __name__ == "__main__":
         ]
     try:
         Parallel(data)
+        #threading.Thread(target=udpsock, args=(udp,ip,port)).start()
+        #threading.Thread(target=tcpsock, args=(tcp,ip,port)).start()
+        #sniff(prn=process_and_send, iface='ens192', count=100)
     except KeyboardInterrupt:
+        udp.close()
+        tcp.close()
         subprocess.run(["killall", os.path.basename(__file__)])
 
 
