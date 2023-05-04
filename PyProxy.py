@@ -40,8 +40,8 @@ def handle(udp, data, addr):
         udp.sendto(answer, addr)
         try:
             print('--------------------------------------------')
-            print(f"to {ip}: {DNSRecord.parse(data)}")
-            print(f"from {ip}: {DNSRecord.parse(answer)}")
+            print(f"\nto {ip}: {DNSRecord.parse(data)}")
+            print(f"\nfrom {ip}: {DNSRecord.parse(answer)}")
             pass
         except: pass
 def udpsock(udp, ip, port):
@@ -62,8 +62,8 @@ def t_handle(conn, data, addr):
         conn.sendto(answer, addr)
         try:
             print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-            print(f"to {ip}: {DNSRecord.parse(data[2:])}")
-            print(f"from {ip}: {DNSRecord.parse(answer[2:])}")
+            print(f"\nto {ip}: {DNSRecord.parse(data[2:])}")
+            print(f"\nfrom {ip}: {DNSRecord.parse(answer[2:])}")
             pass
         except:
             logging.exception('TCP')
