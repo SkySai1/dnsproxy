@@ -1,1 +1,12 @@
+asttokens==2.2.1
+bitstring==4.0.2
+cheap-repr==0.5.1
 dnslib==0.9.23
+dnspython==2.3.0
+executing==1.2.0
+prettytable==3.7.0
+Pygments==2.15.1
+scapy==2.5.0
+six==1.16.0
+snoop==0.4.3
+wcwidth==0.2.6
