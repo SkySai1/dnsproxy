@@ -186,6 +186,8 @@ if __name__ == "__main__":
         sys.exit()
 
     conf = confload(os.path.abspath(file))
+    main = os.path.basename(__file__)
+
     try:
         listen = conf['listen']
         port = int(conf['port'])
@@ -221,7 +223,7 @@ if __name__ == "__main__":
             tcpfork.terminate()
             udpfork.terminate()
             logger('PyProxy was stoped!')
-            subprocess.run(["killall", os.path.basename(__file__)])
+            subprocess.run(["killall", main])
 
 
 
