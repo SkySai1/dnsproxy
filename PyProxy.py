@@ -40,6 +40,7 @@ class UDP:
         except Exception as e:
             logging.exception('UDP START:')
             logger(str(e))
+            sys.exit(1)
 
     def handle(self, data, addr):
         if addr[0] == source: iplist = dest
@@ -98,6 +99,7 @@ class TCP:
         except Exception as e:
             logging.exception('TCP START:')
             logger(str(e))
+            sys.exit(1)
 
     def handle(self, data, addr):
         if addr[0] == source: iplist = dest
