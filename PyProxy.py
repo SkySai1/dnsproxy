@@ -135,15 +135,21 @@ def parser(data:bytes, answer:bytes, source, dest, isudp:bool=True):
             sep = "TCP"
             data = data[2:]
             answer = answer[2:]
-        if data: message = DNSRecord.parse(data)
-        else: message = None
-        logger(f"{sep} {message.header.id} From {source} to {dest}: {message.questions}")
+        if data: 
+            message = DNSRecord.parse(data).questions
+            id = DNSRecord.parse(data).header.id
+        else: 
+            message = id = None
+        logger(f"{sep} {id} From {source} to {dest}: {message}")
 
-        if answer: message = DNSRecord.parse(answer)
-        else: message = None
-        logger(f"{sep} {message.header.id} From {dest} to {source}: {message.get_a().rdata}")
-    except:
-        logging.exception(f'{sep} LOGGER')
+        if answer: 
+            message = DNSRecord.parse(answer).get_a().rdata
+            id = DNSRecord.parse(data).header.id
+        else: 
+            message = id = None
+        logger(f"{sep} {id} From {dest} to {source}: {message}")
+    except Exception as e:
+        logger(e)
         pass
 
 def logger(line):
