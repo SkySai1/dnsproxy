@@ -25,11 +25,15 @@ class UDP:
         self.udp.close()
 
     def start(self):
-        server_address = (self.ip, self.port)
-        self.udp.bind(server_address)
-        message = f'Server is UDP listen now: {server_address}'
-        print(message)
-        logger(message)
+        try:
+            server_address = (self.ip, self.port)
+            self.udp.bind(server_address)
+            message = f'Server is UDP listen now: {server_address}'
+            print(message)
+            logger(message)
+        except Exception as e:
+            logging.exception('UDP START:')
+            logger(e)
         while True:
             try:
                 data, address = self.udp.recvfrom(512)
@@ -74,12 +78,16 @@ class TCP:
         self.tcp.close()
 
     def start(self): 
-        server_address = (self.ip, self.port)
-        self.tcp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-        self.tcp.bind(server_address)
-        message = f'Server is TCP listen now: {server_address}'
-        print(message)
-        logger(message)
+        try:
+            server_address = (self.ip, self.port)
+            self.tcp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+            self.tcp.bind(server_address)
+            message = f'Server is TCP listen now: {server_address}'
+            print(message)
+            logger(message)
+        except Exception as e:
+            logging.exception('TCP START:')
+            logger(e)
         while True:
             try:
                 self.tcp.listen(3)
