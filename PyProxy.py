@@ -31,15 +31,15 @@ class UDP:
             message = f'Server is UDP listen now: {server_address}'
             print(message)
             logger(message)
+            while True:
+                try:
+                    data, address = self.udp.recvfrom(512)
+                    threading.Thread(target=UDP.handle, args=(self, data, address)).start()
+                except Exception as e:
+                    logger(str(e))
         except Exception as e:
             logging.exception('UDP START:')
-            logger(e)
-        while True:
-            try:
-                data, address = self.udp.recvfrom(512)
-                threading.Thread(target=UDP.handle, args=(self, data, address)).start()
-            except Exception as e:
-                logger(e)
+            logger(str(e))
 
     def handle(self, data, addr):
         if addr[0] == source: iplist = dest
@@ -85,19 +85,19 @@ class TCP:
             message = f'Server is TCP listen now: {server_address}'
             print(message)
             logger(message)
+            while True:
+                try:
+                    self.tcp.listen(3)
+                    self.conn, addr = self.tcp.accept()
+                    data = self.conn.recv(32768)
+                    if data:
+                        threading.Thread(target=TCP.handle, args=(self, data, addr)).start()
+                except Exception as e:
+                    logger(str(e))
+                    pass
         except Exception as e:
             logging.exception('TCP START:')
-            logger(e)
-        while True:
-            try:
-                self.tcp.listen(3)
-                self.conn, addr = self.tcp.accept()
-                data = self.conn.recv(32768)
-                if data:
-                    threading.Thread(target=TCP.handle, args=(self, data, addr)).start()
-            except Exception as e:
-                logger(e)
-                pass
+            logger(str(e))
 
     def handle(self, data, addr):
         if addr[0] == source: iplist = dest
@@ -149,7 +149,7 @@ def parser(data:bytes, answer:bytes, source, dest, isudp:bool=True):
             message = id = None
         logger(f"{sep} {id} From {dest} to {source}: {message}")
     except Exception as e:
-        logger(e)
+        logger(str(e))
         pass
 
 def logger(line):
@@ -211,7 +211,7 @@ if __name__ == "__main__":
             udpfork = Process(target=udp.start)
             udpfork.start()
     except Exception as e:
-        logger(e)
+        logger(str(e))
         logging.exception('LAUNCH')
         pass
     else:
