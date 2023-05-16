@@ -25,22 +25,18 @@ class UDP:
         self.udp.close()
 
     def start(self):
-        try:
-            server_address = (self.ip, self.port)
-            self.udp.bind(server_address)
-            message = f'Server is UDP listen now: {server_address}'
-            print(message)
-            logger(message)
-            while True:
-                try:
-                    data, address = self.udp.recvfrom(512)
-                    threading.Thread(target=UDP.handle, args=(self, data, address)).start()
-                except Exception as e:
-                    logger(str(e))
-        except Exception as e:
-            logging.exception('UDP START:')
-            logger(str(e))
-            sys.exit(1)
+        server_address = (self.ip, self.port)
+        self.udp.bind(server_address)
+        message = f'Server is UDP listen now: {server_address}'
+        print(message)
+        logger(message)
+        while True:
+            try:
+                data, address = self.udp.recvfrom(512)
+                threading.Thread(target=UDP.handle, args=(self, data, address)).start()
+            except Exception as e:
+                logger(str(e))
+
 
     def handle(self, data, addr):
         if addr[0] == source: iplist = dest
@@ -79,27 +75,22 @@ class TCP:
         self.tcp.close()
 
     def start(self): 
-        try:
-            server_address = (self.ip, self.port)
-            self.tcp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-            self.tcp.bind(server_address)
-            message = f'Server is TCP listen now: {server_address}'
-            print(message)
-            logger(message)
-            while True:
-                try:
-                    self.tcp.listen(3)
-                    self.conn, addr = self.tcp.accept()
-                    data = self.conn.recv(32768)
-                    if data:
-                        threading.Thread(target=TCP.handle, args=(self, data, addr)).start()
-                except Exception as e:
-                    logger(str(e))
-                    pass
-        except Exception as e:
-            logging.exception('TCP START:')
-            logger(str(e))
-            sys.exit(1)
+        server_address = (self.ip, self.port)
+        self.tcp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        self.tcp.bind(server_address)
+        message = f'Server is TCP listen now: {server_address}'
+        print(message)
+        logger(message)
+        while True:
+            try:
+                self.tcp.listen(3)
+                self.conn, addr = self.tcp.accept()
+                data = self.conn.recv(32768)
+                if data:
+                    threading.Thread(target=TCP.handle, args=(self, data, addr)).start()
+            except Exception as e:
+                logger(str(e))
+                pass
 
     def handle(self, data, addr):
         if addr[0] == source: iplist = dest
