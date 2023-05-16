@@ -27,13 +27,15 @@ class UDP:
     def start(self):
         server_address = (self.ip, self.port)
         self.udp.bind(server_address)
-        print(f'Server is UDP listen now: {self.ip, self.port}')
-        try:
-            while True:
-                data, address = self.udp.recvfrom(512) #receive(udp)
+        message = f'Server is UDP listen now: {server_address}'
+        print(message)
+        logger(message)
+        while True:
+            try:
+                data, address = self.udp.recvfrom(512)
                 threading.Thread(target=UDP.handle, args=(self, data, address)).start()
-        except KeyboardInterrupt:
-            pass
+            except Exception as e:
+                logger(e)
 
     def handle(self, data, addr):
         if addr[0] == source: iplist = dest
@@ -43,7 +45,7 @@ class UDP:
             for ip in iplist:
                 answer = UDP.query(data, (ip, 53))
                 self.udp.sendto(answer, addr)
-                logger(data,answer,addr[0],ip)
+                parser(data,answer,addr[0],ip)
 
     def query(data, addr):
         send = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -71,20 +73,23 @@ class TCP:
     def __exit__(self, exc_type, exc_value, exc_traceback):
         self.tcp.close()
 
-    def start(self):
+    def start(self): 
         server_address = (self.ip, self.port)
-        self.tcp.bind(server_address)
         self.tcp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-        print(f'Server is TCP listen now: {self.ip, self.port}')
-        try:
-            while True:
+        self.tcp.bind(server_address)
+        message = f'Server is TCP listen now: {server_address}'
+        print(message)
+        logger(message)
+        while True:
+            try:
                 self.tcp.listen(3)
                 self.conn, addr = self.tcp.accept()
                 data = self.conn.recv(32768)
                 if data:
                     threading.Thread(target=TCP.handle, args=(self, data, addr)).start()
-        except KeyboardInterrupt:
-            pass
+            except Exception as e:
+                logger(e)
+                pass
 
     def handle(self, data, addr):
         if addr[0] == source: iplist = dest
@@ -94,7 +99,7 @@ class TCP:
             for ip in iplist:
                 answer = TCP.query(data, (ip, 53))
                 self.conn.sendto(answer, addr)
-                logger(data,answer,addr[0],ip,False)
+                parser(data,answer,addr[0],ip,False)
 
         
     def query(data, addr):
@@ -115,28 +120,32 @@ class TCP:
 
 ### Основной Блок
 
-def logger(data:bytes, answer:bytes, source, dest, isudp:bool=True):
+def parser(data:bytes, answer:bytes, source, dest, isudp:bool=True):
     try:
         if isudp is True: sep = "UDP"
         else:
             sep = "TCP"
             data = data[2:]
             answer = answer[2:]
-        now = datetime.now().strftime('%m/%d %H:%M:%S')
-        print('\n')
-        print(now, sep)
-
-        if data: message = DNSRecord.parse(data).questions
+        if data: message = DNSRecord.parse(data)
         else: message = None
-        print(f"\t{now} {sep} # From {source} to {dest}: {message}")
+        logger(f"{sep} {message.header.id} From {source} to {dest}: {message.questions}")
 
-        if answer: message = DNSRecord.parse(answer).get_a().rdata
+        if answer: message = DNSRecord.parse(answer)
         else: message = None
-        print(f"\t{now} {sep} # From {dest} to {source}: {message}")
+        logger(f"{sep} {message.header.id} From {dest} to {source}: {message.get_a().rdata}")
     except:
         logging.exception(f'{sep} LOGGER')
         pass
 
+def logger(line):
+    try:
+        if conf['logging'] is True:
+            now = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
+            with open(logway, 'a+') as log:
+                log.write(now + ' ' + line + '\n')
+    except:
+        logging.exception('LOGGER:')
 
 def confload(path):
     '''
@@ -168,6 +177,7 @@ if __name__ == "__main__":
         source = conf['source']
         dest = list(conf['dest'])
         islog = bool(conf['logging'])
+        logway = os.path.abspath(conf['logfile'])
         ipaddress.ip_address(listen)
         ipaddress.ip_address(source)
         for ip in dest:
@@ -176,6 +186,8 @@ if __name__ == "__main__":
         logging.exception('BAD CONFIG')
         sys.exit()
 
+    if islog is not True: print('Logging of events is disabled!')
+
     try:
         with TCP(listen, port) as tcp: 
             tcpfork = Process(target=tcp.start)
@@ -183,7 +195,8 @@ if __name__ == "__main__":
         with UDP(listen, port) as udp: 
             udpfork = Process(target=udp.start)
             udpfork.start()
-    except:
+    except Exception as e:
+        logger(e)
         logging.exception('LAUNCH')
         pass
     else:
@@ -192,6 +205,7 @@ if __name__ == "__main__":
         except KeyboardInterrupt: 
             tcpfork.terminate()
             udpfork.terminate()
+            logger('PyProxy was stoped!')
             subprocess.run(["killall", os.path.basename(__file__)])
 
 
