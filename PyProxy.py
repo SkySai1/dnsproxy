@@ -153,9 +153,10 @@ def confload(path):
     {
         "port": 53,
         "listen": "10.162.128.4",
-        "source": ["77.73.132.32"],
-        "dest": "95.165.134.11",
-        "logging": true
+        "source": "95.165.134.11",
+        "dest": ["77.73.132.32", "8.8.8.8"],
+        "logging": true,
+        "logfile": "./pyproxy.log"
     }
     '''
     with open(path, 'r') as j:
