@@ -11,6 +11,10 @@ from datetime import datetime
 from dnslib import DNSRecord
 from multiprocessing import Process
 
+# To packet forwards: 
+'''iptables -t nat -A PREROUTING -p udp -d <IP> --dport 53 -j DNAT --to-destination <IP>:<PROXY_PORT>'''
+
+
 #UDP SOCK
 class UDP:
     def __init__(self, ip, port):
