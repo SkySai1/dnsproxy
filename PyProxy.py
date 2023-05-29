@@ -170,6 +170,7 @@ def parser(data:bytes, answer:bytes, source, dest, isudp:bool=True):
 
 def logger(line):
     try:
+        if _DEBUG is True: print(line)
         if conf['logging'] is True:
             now = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
             with open(logway, 'a+') as log:
@@ -194,9 +195,12 @@ def confload(path):
     return data
 
 if __name__ == "__main__":
-
+    _DEBUG = False
     try:
         file = sys.argv[1]
+        if sys.argv[2]:
+            if sys.argv[2] == 'debug':
+                _DEBUG = True
     except:
         print('Specify path to config.json')
         sys.exit()
