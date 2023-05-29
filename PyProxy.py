@@ -43,7 +43,6 @@ class UDP:
             server_address = (self.ip, self.port)
             self.udp.bind(server_address)
             message = f'Server is UDP listen now: {server_address}'
-            print(message)
             logger(message)
             while True:
                 try:
@@ -57,17 +56,30 @@ class UDP:
             subprocess.run(["killall", main])
 
     def handle(self, data, addr):
-        if addr[0] == source: iplist = dest
-        elif addr[0] in dest: iplist = [source]
-        else: iplist = None
+        iplist, istosource = handler(addr)
         if type(iplist) is list:
+            stream = []
             for ip in iplist:
-                answer = UDP.query(data, (ip, 53))
+                t = AnswerThread(UDP,data,ip,self.udp,addr)
+                t.start()
+                if istosource is True:
+                    t.join()
+                    parser(data, t.answer, addr[0], t.ip)
+                    if t.answer: break
+                else:
+                    stream.append(t)
+            if stream:
+                for t in stream:
+                    t.join()
+                    parser(data, t.answer, addr[0], t.ip)
+                '''answer = UDP.query(data, (ip, 53))
                 self.udp.sendto(answer, addr)
-                parser(data,answer,addr[0],ip)
+                parser(data,answer,addr[0],ip)'''
+                #if istosource is True and answer: break
 
     def query(data, addr):
         send = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        send.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         send.settimeout(1)
         send.sendto(data, addr)
         try:
@@ -98,7 +110,6 @@ class TCP:
             self.tcp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
             self.tcp.bind(server_address)
             message = f'Server is TCP listen now: {server_address}'
-            print(message)
             logger(message)
             while True:
                 try:
@@ -116,18 +127,33 @@ class TCP:
             subprocess.run(["killall", main])
 
     def handle(self, data, addr):
-        if addr[0] == source: iplist = dest
-        elif addr[0] in dest: iplist = [source]
-        else: ip = None
+        iplist = []
+        iplist, istosource = handler(addr)
         if type(iplist) is list:
+            stream = []
             for ip in iplist:
-                answer = TCP.query(data, (ip, 53))
+                t = AnswerThread(TCP,data,ip,self.conn,addr)
+                t.start()
+                if istosource is True:
+                    t.join()
+                    parser(data, t.answer, addr[0], t.ip, False)
+                    if t.answer: break
+                else:
+                    stream.append(t)
+            if stream:
+                for t in stream:
+                    t.join()
+                    parser(data, t.answer, addr[0], t.ip, False)
+            ''' answer = TCP.query(data, (ip, 53))
                 self.conn.sendto(answer, addr)
                 parser(data,answer,addr[0],ip,False)
+                if answer: break'''
+
 
         
     def query(data, addr):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         s.connect(addr)
         s.sendall(data)
         s.settimeout(2)
@@ -143,6 +169,45 @@ class TCP:
     
 
 ### Основной Блок
+
+class AnswerThread(threading.Thread):
+
+    def __init__(self, PROTO:UDP|TCP, data, ip, socket:socket.socket, addr:tuple):
+        threading.Thread.__init__(self)
+        self.value = None
+        self.proto = PROTO
+        self.data = data
+        self.ip = ip
+        self.socket = socket
+        self.addr = addr
+ 
+    def run(self):
+        answer = self.proto.query(self.data, (self.ip, 53))
+        self.socket.sendto(answer, self.addr)
+        self.answer = answer
+
+
+
+def handler(addr):
+    iplist = []
+    istosource = False
+    if addr[0] in source:
+        try:
+            for network in dest:
+                for ip in ipaddress.ip_network(network):
+                    iplist.append(str(ip))
+        except:
+            pass
+    else:
+        try:
+            for network in dest:
+                if ipaddress.ip_address(addr[0]) in ipaddress.ip_network(network):
+                    iplist = source
+                    istosource = True
+                    break
+        except:
+                pass
+    return iplist, istosource
 
 def parser(data:bytes, answer:bytes, source, dest, isudp:bool=True):
     try:
@@ -164,13 +229,14 @@ def parser(data:bytes, answer:bytes, source, dest, isudp:bool=True):
         else: 
             message = id = None
         logger(f"{sep} {id} From {dest} to {source}: {message}")
+        if _DEBUG >= 2: print('\n', DNSRecord.parse(answer))
     except Exception as e:
         logger(str(e))
         pass
 
 def logger(line):
     try:
-        if _DEBUG is True: print(line)
+        if _DEBUG >= 1: print('\n', line)
         if conf['logging'] is True:
             now = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
             with open(logway, 'a+') as log:
@@ -198,9 +264,13 @@ if __name__ == "__main__":
     _DEBUG = False
     try:
         file = sys.argv[1]
-        if sys.argv[2]:
-            if sys.argv[2] == 'debug':
-                _DEBUG = True
+        try:
+            if sys.argv[2] == '1':
+                _DEBUG = 1
+            elif sys.argv[2] == '2':
+                _DEBUG = 2
+        except:
+            pass
     except:
         print('Specify path to config.json')
         sys.exit()
@@ -216,9 +286,12 @@ if __name__ == "__main__":
         islog = bool(conf['logging'])
         logway = os.path.abspath(conf['logfile'])
         ipaddress.ip_address(listen)
-        ipaddress.ip_address(source)
-        for ip in dest:
+        for ip in source:
             ipaddress.ip_address(ip)
+        for ip in dest:
+            try: ipaddress.ip_address(ip)
+            except: 
+                broadcast = ipaddress.ip_network(ip)
     except:
         logging.exception('BAD CONFIG')
         sys.exit()
