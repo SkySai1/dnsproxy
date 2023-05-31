@@ -8,6 +8,7 @@ import subprocess
 import json
 import ipaddress
 from datetime import datetime
+import time
 from dnslib import DNSRecord
 from multiprocessing import Process
 
@@ -71,14 +72,14 @@ class UDP:
                 t.start()
                 if istosource is True:
                     t.join()
-                    parser(data, t.answer, addr[0], t.ip)
+                    parser(data, t.answer, addr[0], t.ip, True, t.error)
                     if t.answer: break
                 else:
                     stream.append(t)
             if stream:
                 for t in stream:
                     t.join()
-                    parser(data, t.answer, addr[0], t.ip)
+                    parser(data, t.answer, addr[0], t.ip, True, t.error)
                 '''answer = UDP.query(data, (ip, 53))
                 self.udp.sendto(answer, addr)
                 parser(data,answer,addr[0],ip)'''
@@ -87,14 +88,17 @@ class UDP:
     def query(data, addr):
         send = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         send.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        send.settimeout(1)
-        send.sendto(data, addr)
+        send.settimeout(0.2)
+        answer = b''
+        error = None
         try:
+            send.sendto(data, addr)
             answer, addr = send.recvfrom(512)
-        except:
-            answer = ''.encode('utf-8')
-        send.close()
-        return answer
+        except Exception as e:
+            error = str(e)
+        finally:
+            send.close()
+            return answer, error
 
 
 #TCP SOCK
@@ -143,36 +147,37 @@ class TCP:
                 t.start()
                 if istosource is True:
                     t.join()
-                    parser(data, t.answer, addr[0], t.ip, False)
+                    parser(data, t.answer, addr[0], t.ip, False, t.error)
                     if t.answer: break
                 else:
                     stream.append(t)
             if stream:
                 for t in stream:
                     t.join()
-                    parser(data, t.answer, addr[0], t.ip, False)
-            ''' answer = TCP.query(data, (ip, 53))
-                self.conn.sendto(answer, addr)
-                parser(data,answer,addr[0],ip,False)
-                if answer: break'''
+                    parser(data, t.answer, addr[0], t.ip, False, t.error)
 
 
         
     def query(data, addr):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        s.connect(addr)
-        s.sendall(data)
-        s.settimeout(2)
-        answer = b''
-        packet = True
+        s.settimeout(0.2)
         try:
-            while packet:
-                packet = s.recv(4096)
-                answer+=packet
-        except socket.timeout: pass
-        s.close()
-        return answer
+            answer = b''
+            error = None
+            s.connect(addr)
+            s.sendall(data)
+            packet = True
+            while True:
+                try:
+                    packet = s.recv(4096)
+                    answer+=packet
+                except socket.timeout: break
+        except Exception as e: 
+            error = str(e)
+        finally: 
+            s.close()
+            return answer, error
     
 
 ### Основной Блок
@@ -189,9 +194,11 @@ class AnswerThread(threading.Thread):
         self.addr = addr
  
     def run(self):
-        answer = self.proto.query(self.data, (self.ip, 53))
+        answer, error = self.proto.query(self.data, (self.ip, 53))
         self.socket.sendto(answer, self.addr)
         self.answer = answer
+        self.error = error
+        return
 
 
 
@@ -216,7 +223,7 @@ def handler(addr):
                 pass
     return iplist, istosource
 
-def parser(data:bytes, answer:bytes, source, dest, isudp:bool=True):
+def parser(data:bytes, answer:bytes|str, source, dest, isudp:bool=True, error:str=None):
     try:
         if isudp is True: sep = "UDP"
         else:
@@ -229,12 +236,11 @@ def parser(data:bytes, answer:bytes, source, dest, isudp:bool=True):
         else: 
             message = id = None
         logger(f"{sep} {id} From {source} to {dest}: {message}")
-
-        if answer: 
+        if answer:
             message = DNSRecord.parse(answer).get_a().rdata
             id = DNSRecord.parse(data).header.id
         else: 
-            message = id = None
+            message = error
         logger(f"{sep} {id} From {dest} to {source}: {message}")
         if _DEBUG >= 2: print('\n', DNSRecord.parse(answer))
     except Exception as e:
