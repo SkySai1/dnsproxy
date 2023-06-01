@@ -184,7 +184,7 @@ class TCP:
 
 class AnswerThread(threading.Thread):
 
-    def __init__(self, PROTO:UDP|TCP, data, ip, socket:socket.socket, addr:tuple):
+    def __init__(self, PROTO:UDP|TCP, data, ip, socket:socket.socket|socket.socket.connect, addr:tuple):
         threading.Thread.__init__(self)
         self.value = None
         self.proto = PROTO
@@ -195,7 +195,8 @@ class AnswerThread(threading.Thread):
  
     def run(self):
         answer, error = self.proto.query(self.data, (self.ip, 53))
-        self.socket.sendto(answer, self.addr)
+        try: self.socket.sendto(answer, self.addr)
+        except Exception as e: error = str(e)
         self.answer = answer
         self.error = error
         return
