@@ -184,7 +184,7 @@ class TCP:
 
 class AnswerThread(threading.Thread):
 
-    def __init__(self, PROTO:UDP|TCP, data, ip, socket:socket.socket|socket.socket.connect, addr:tuple):
+    def __init__(self, PROTO:UDP|TCP, data, ip, socket:socket.socket, addr:tuple):
         threading.Thread.__init__(self)
         self.value = None
         self.proto = PROTO
