@@ -88,6 +88,7 @@ class UDP:
     def query(data, addr):
         send = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         send.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        send.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         send.settimeout(0.2)
         answer = b''
         error = None
@@ -161,6 +162,7 @@ class TCP:
     def query(data, addr):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.settimeout(0.2)
         try:
             answer = b''
@@ -173,7 +175,7 @@ class TCP:
                     packet = s.recv(4096)
                     answer+=packet
                 except socket.timeout: break
-        except Exception as e: 
+        except Exception as e:
             error = str(e)
         finally: 
             s.close()
