@@ -86,16 +86,17 @@ class UDP:
                 #if istosource is True and answer: break
 
     def query(data, addr):
-        send = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        send.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        send.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        send.settimeout(0.2)
-        answer = b''
-        error = None
         try:
+            send = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            send.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            send.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            send.settimeout(0.2)
+            answer = b''
+            error = None
             send.sendto(data, addr)
             answer, addr = send.recvfrom(512)
         except Exception as e:
+            logging.exception('UDP QUERY')
             error = str(e)
         finally:
             send.close()
@@ -161,8 +162,8 @@ class TCP:
         
     def query(data, addr):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        #s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         s.settimeout(0.2)
         try:
             answer = b''
@@ -176,6 +177,7 @@ class TCP:
                     answer+=packet
                 except socket.timeout: break
         except Exception as e:
+            logging.exception('TCP QUERY')
             error = str(e)
         finally: 
             s.close()
