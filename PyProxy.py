@@ -9,7 +9,7 @@ import json
 import ipaddress
 from datetime import datetime
 import time
-from dnslib import DNSRecord
+from dnslib import DNSRecord, RCODE
 from multiprocessing import Process
 
 # To packet forwards: 
@@ -242,7 +242,7 @@ def parser(data:bytes, answer:bytes|str, source, dest, isudp:bool=True, error:st
             message = id = None
         logger(f"{sep} {id} From {source} to {dest}: {message}")
         if answer:
-            message = f"{DNSRecord.parse(answer).header.rcode}: {DNSRecord.parse(answer).get_a().rdata}"
+            message = f"{RCODE[DNSRecord.parse(answer).header.rcode]}: {DNSRecord.parse(answer).get_a().rdata}"
             id = DNSRecord.parse(data).header.id
         else: 
             message = error
