@@ -36,7 +36,7 @@ To save way #2:
 #UDP SOCK
 class UDP:
     def __init__(self, ip, port):
-        self.udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # <- Сокет входящих TCP запросов
         self.ip = ip
         self.port = port
 
@@ -49,13 +49,13 @@ class UDP:
     def start(self):
         try:
             server_address = (self.ip, self.port)
-            self.udp.bind(server_address)
+            self.udp.bind(server_address) # <- Привязываем сокет к адресу и порту
             message = f'Server is UDP listen now: {server_address}'
             logger(message)
             while True:
                 try:
-                    data, address = self.udp.recvfrom(512)
-                    threading.Thread(target=UDP.handle, args=(self, data, address)).start()
+                    data, address = self.udp.recvfrom(512) # <- Прослишваем и ловим запросы
+                    threading.Thread(target=UDP.handle, args=(self, data, address)).start() # <- Как запрос пришёл отправялем его в отдельный поток
                 except Exception as e:
                     logger(str(e))
         except Exception as e:
@@ -64,17 +64,17 @@ class UDP:
             subprocess.run(["killall", main])
 
     def handle(self, data, addr):
-        iplist, istosource = handler(addr)
+        iplist, istosource = handler(addr) # <- обработчик адреса клиента
         if type(iplist) is list:
             stream = []
-            for ip in iplist:
-                t = AnswerThread(UDP,data,ip,self.udp,addr)
+            for ip in iplist: # <- Перенаправим запрос каждому адрессату в списке
+                t = AnswerThread(UDP,data,ip,self.udp,addr) # <- в отдельном потоке
                 t.start()
-                if istosource is True:
+                if istosource is True: # <- Если запрос ушёл Источнику, сразу его обработаем
                     t.join()
                     parser(data, t.answer, addr[0], t.ip, True, t.error)
                     if t.answer: break
-                else:
+                else: # <- Если нет, то сформируем массив потоков и ниже его обработаем по факту завершения каждого из них
                     stream.append(t)
             if stream:
                 for t in stream:
@@ -87,14 +87,14 @@ class UDP:
 
     def query(data, addr):
         try:
-            send = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            send.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-            send.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            send.settimeout(0.2)
+            send = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # <- Сокет для оптравки UDP сообщений
+            send.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1) # <- Разрашаем использовать широковещание
+            send.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # <- Разрашаем переиспользовать сокет
+            send.settimeout(0.2) # <- Установка таймаута на ответ
             answer = b''
             error = None
             send.sendto(data, addr)
-            answer, addr = send.recvfrom(512)
+            answer, addr = send.recvfrom(512) # <- В течении ожидаем получений одной датаграммы размеров не более 512 байт
         except Exception as e:
             logging.exception('UDP QUERY')
             error = str(e)
@@ -107,7 +107,7 @@ class UDP:
 class TCP:
 
     def __init__(self, ip, port):
-        self.tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # <- Сокет входящих TCP запросов
         self.ip = ip
         self.port = port
 
@@ -117,19 +117,20 @@ class TCP:
     def __exit__(self, exc_type, exc_value, exc_traceback):
         self.tcp.close()
 
-    def start(self): 
+    # --Функция старта
+    def start(self):
         try:
-            server_address = (self.ip, self.port)
-            self.tcp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-            self.tcp.bind(server_address)
+            server_address = (self.ip, self.port) 
+            self.tcp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1) # <- Для переиспользовании сокета входящих запросов
+            self.tcp.bind(server_address) # <- Привязываем сокет к адресу и порту
             message = f'Server is TCP listen now: {server_address}'
             logger(message)
             while True:
                 try:
-                    self.tcp.listen(3)
-                    self.conn, addr = self.tcp.accept()
-                    data = self.conn.recv(32768)
-                    if data:
+                    self.tcp.listen(3) # <- количество безуспешных попыток подключится
+                    self.conn, addr = self.tcp.accept() # <-Принятие запроса
+                    data = self.conn.recv(32768) # <- Установка соединения и получения данных
+                    if data: # <- При получении данных создаём отдельный поток и обрабатываем их
                         threading.Thread(target=TCP.handle, args=(self, data, addr)).start()
                 except Exception as e:
                     logger(str(e))
@@ -139,19 +140,20 @@ class TCP:
             logger(str(e))
             subprocess.run(["killall", main])
 
+    # --Функция для использования в отдельном потоке и обработке данных
     def handle(self, data, addr):
         iplist = []
-        iplist, istosource = handler(addr)
+        iplist, istosource = handler(addr) # <- обработчик адреса клиента
         if type(iplist) is list:
             stream = []
-            for ip in iplist:
-                t = AnswerThread(TCP,data,ip,self.conn,addr)
+            for ip in iplist: # <- Перенаправим запрос каждому адрессату в списке
+                t = AnswerThread(TCP,data,ip,self.conn,addr) # <- в отдельном потоке
                 t.start()
-                if istosource is True:
+                if istosource is True: # <- Если запрос ушёл Источнику, сразу его обработаем
                     t.join()
                     parser(data, t.answer, addr[0], t.ip, False, t.error)
                     if t.answer: break
-                else:
+                else: # <- Если нет, то сформируем массив потоков и ниже его обработаем по факту завершения каждого из них
                     stream.append(t)
             if stream:
                 for t in stream:
@@ -159,29 +161,29 @@ class TCP:
                     parser(data, t.answer, addr[0], t.ip, False, t.error)
 
 
-        
+    # -- Функция ответа        
     def query(data, addr):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        #s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-        s.settimeout(0.2)
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # <- Сокет для оптравки TCP сообщений
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1) # <- Разрашаем использовать широковещание
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1) # <- Разрашаем переиспользовать сокет
+        s.settimeout(0.2) # <- Ставим таймаут на получения пакетов после отправки запроса
         try:
-            answer = b''
+            answer = b'' # <- Погдотвим, заранее, пустой ответ
             error = None
-            s.connect(addr)
-            s.sendall(data)
+            s.connect(addr) # <- Подключаемся 
+            s.sendall(data) # <- Отправляем запрос
             packet = True
-            while True:
+            while True: # <- В рамках таймаута ждём получения пакетов, затем закрываем соединение, если ответ был большой мы его кастрариуем (и сломаем как следствие)
                 try:
                     packet = s.recv(4096)
                     answer+=packet
-                except socket.timeout: break
+                except socket.timeout: break # <- Закрываем соединение после таймаута
         except Exception as e:
             logging.exception('TCP QUERY')
             error = str(e)
         finally: 
             s.close()
-            return answer, error
+            return answer, error # <- Возвращаем ответ и ошибку, если есть
     
 
 ### Основной Блок
@@ -191,63 +193,64 @@ class AnswerThread(threading.Thread):
     def __init__(self, PROTO:UDP|TCP, data, ip, socket:socket.socket, addr:tuple):
         threading.Thread.__init__(self)
         self.value = None
-        self.proto = PROTO
+        self.proto = PROTO # <- Универасльный аргумент как для UDP сокета, так и для TCP коннекта
         self.data = data
         self.ip = ip
         self.socket = socket
         self.addr = addr
  
     def run(self):
-        answer, error = self.proto.query(self.data, (self.ip, 53))
-        try: self.socket.sendto(answer, self.addr)
+        answer, error = self.proto.query(self.data, (self.ip, 53)) # <- Перенаправляем запрос в зависимости от протокола и получаем ответ
+        try: self.socket.sendto(answer, self.addr) # <- Возращаем инициатору ответ
         except Exception as e: error = str(e)
         self.answer = answer
         self.error = error
         return
 
 
-
+# --Обработчик адреса клиента
 def handler(addr):
-    iplist = []
-    istosource = False
-    if addr[0] in source:
+    iplist = [] # <- Лист адресов для отправки ответа
+    istosource = False # <- Условие адреса (к Источнику (в конфиге), или от Источника)
+    if addr[0] in source: # <- Если входящий адрес относится к Источнику
         try:
-            for network in dest:
-                for ip in ipaddress.ip_network(network):
+            for network in dest: # <- Формируем лист адресов для отправки ответа
+                for ip in ipaddress.ip_network(network): # <- Преобразуем сеть в список адресов этой сети
                     iplist.append(str(ip))
         except:
             pass
-    else:
+    else: # <- Если входящий адрес не относится к источнику
         try:
             for network in dest:
                 if ipaddress.ip_address(addr[0]) in ipaddress.ip_network(network):
-                    iplist = source
-                    istosource = True
+                    iplist = source # <- адрессатом будет Источник
+                    istosource = True # <- Явно указываем это
                     break
         except:
                 pass
     return iplist, istosource
 
+# -- Обработчик DNS сообщений для последующего их логирования
 def parser(data:bytes, answer:bytes|str, source, dest, isudp:bool=True, error:str=None):
     try:
-        if isudp is True: sep = "UDP"
-        else:
-            sep = "TCP"
+        if isudp is True: sep = "UDP" # <- Если это UDP, то всё ок
+        else: # <- Если TCP, то отрежим первые дай байта, как от ответа, так и от запроса
+            sep = "TCP" 
             data = data[2:]
             answer = answer[2:]
-        if data: 
+        if data: # <- Если есть ответ, то это DNS пакет, а значит декодируем его
             message = DNSRecord.parse(data).questions
             id = DNSRecord.parse(data).header.id
         else: 
             message = id = None
-        logger(f"{sep} {id} From {source} to {dest}: {message}")
-        if answer:
+        logger(f"{sep} {id} From {source} to {dest}: {message}") # <- Запишем в лог строку запроса
+        if answer: # <- Если есть ответ, то декодируем его
             message = f"{RCODE[DNSRecord.parse(answer).header.rcode]}: {DNSRecord.parse(answer).get_a().rdata}"
             id = DNSRecord.parse(data).header.id
         else: 
             message = error
-        logger(f"{sep} {id} From {dest} to {source}: {message}")
-        if _DEBUG >= 2: print('\n', DNSRecord.parse(answer))
+        logger(f"{sep} {id} From {dest} to {source}: {message}") # <- Запише в лог строку ответа
+        if _DEBUG >= 2: print('\n', DNSRecord.parse(answer)) # <- Если включен дебаг еще и в консоль выведем 
     except Exception as e:
         logger(str(e))
         pass
@@ -279,10 +282,12 @@ def confload(path):
     return data
 
 if __name__ == "__main__":
-    _DEBUG = False
+    _DEBUG = False # <- Режим отладки
+
+    
     try:
-        file = sys.argv[1]
-        try:
+        file = sys.argv[1] # <- Подключаем файл настроек
+        try: # <- Включаем режим отладки при пуске в качестве третьего аругмента
             if sys.argv[2] == '1':
                 _DEBUG = 1
             elif sys.argv[2] == '2':
@@ -293,9 +298,10 @@ if __name__ == "__main__":
         print('Specify path to config.json')
         sys.exit()
 
-    conf = confload(os.path.abspath(file))
-    main = os.path.basename(__file__)
+    conf = confload(os.path.abspath(file)) # <- получаем абсолютный путь до конфига
+    main = os.path.basename(__file__) # <-получаем директория самого файла
 
+    # --Считываем конфиг, в случае несоотетствии формата - ошибка --
     try:
         listen = conf['listen']
         port = int(conf['port'])
@@ -314,20 +320,24 @@ if __name__ == "__main__":
         logging.exception('BAD CONFIG')
         sys.exit()
 
-    if islog is not True: print('Logging of events is disabled!')
+    if islog is not True: print('Logging of events is disabled!') # <-- Предупреждене об отключении логирование
 
     try:
-        with TCP(listen, port) as tcp: 
+        # -- Стартуем TCP сервер как форк-процесс:
+        with TCP(listen, port) as tcp: # <- Инициализируем класс и передаём адрес и порт для прослушивания
             tcpfork = Process(target=tcp.start)
             tcpfork.start()
-        with UDP(listen, port) as udp: 
+        
+        # --Стартуем UDP сервер как форк-процесс:
+        with UDP(listen, port) as udp: # <- Инициализируем класс и передаём адрес и порт для прослушивания
             udpfork = Process(target=udp.start)
             udpfork.start()
-    except Exception as e:
+    except Exception as e: # <- Если что-то пошло не так
         logger(str(e))
         logging.exception('LAUNCH')
         pass
     else:
+        # --Конструкция по отслеживанию нажатия CTRL+C и последующей остановки форков
         try: 
             while True: pass
         except KeyboardInterrupt: 
