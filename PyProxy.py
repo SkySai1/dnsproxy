@@ -59,7 +59,7 @@ class UDP:
                 except Exception as e:
                     logger(str(e))
         except Exception as e:
-            logging.exception('UDP START:')
+            #logging.exception('UDP START:')
             logger(str(e))
             subprocess.run(["killall", main])
 
@@ -96,7 +96,7 @@ class UDP:
             send.sendto(data, addr)
             answer, addr = send.recvfrom(512) # <- В течении ожидаем получений одной датаграммы размеров не более 512 байт
         except Exception as e:
-            logging.exception('UDP QUERY')
+            #logging.exception('UDP QUERY')
             error = str(e)
         finally:
             send.close()
@@ -129,13 +129,13 @@ class TCP:
                 try:
                     self.tcp.listen(3) # <- количество безуспешных попыток подключится
                     self.conn, addr = self.tcp.accept() # <-Принятие запроса
-                    self.conn.settimeout(1) # <- лимит времени открытия соединения
+                    self.conn.settimeout(3) # <- лимит времени открытия соединения
                     data = self.conn.recv(32768) # <- Установка соединения и получения данных
                     if data: # <- При получении данных создаём отдельный поток и обрабатываем их
                         threading.Thread(target=TCP.handle, args=(self, data, addr)).start()
-                    self.conn.close() # <- закрытие соединения
+                    #self.conn.close() # <- закрытие соединения
                 except Exception as e:
-                    logging.exception('TCP TIMEOUT')
+                    logging.exception('TCP')
                     logger(str(e))
                     pass
         except Exception as e:
@@ -145,23 +145,28 @@ class TCP:
 
     # --Функция для использования в отдельном потоке и обработке данных
     def handle(self, data, addr):
-        iplist = []
-        iplist, istosource = handler(addr) # <- обработчик адреса клиента
-        if type(iplist) is list:
-            stream = []
-            for ip in iplist: # <- Перенаправим запрос каждому адрессату в списке
-                t = AnswerThread(TCP,data,ip,self.conn,addr) # <- в отдельном потоке
-                t.start()
-                if istosource is True: # <- Если запрос ушёл Источнику, сразу его обработаем
-                    t.join()
-                    parser(data, t.answer, addr[0], t.ip, False, t.error)
-                    if t.answer: break
-                else: # <- Если нет, то сформируем массив потоков и ниже его обработаем по факту завершения каждого из них
-                    stream.append(t)
-            if stream:
-                for t in stream:
-                    t.join()
-                    parser(data, t.answer, addr[0], t.ip, False, t.error)
+        try:
+            iplist = []
+            iplist, istosource = handler(addr) # <- обработчик адреса клиента
+            if type(iplist) is list:
+                stream = []
+                for ip in iplist: # <- Перенаправим запрос каждому адрессату в списке
+                    t = AnswerThread(TCP,data,ip,self.conn,addr) # <- в отдельном потоке
+                    t.start()
+                    if istosource is True: # <- Если запрос ушёл Источнику, сразу его обработаем
+                        t.join()
+                        parser(data, t.answer, addr[0], t.ip, False, t.error)
+                        if t.answer: break # <- Если удалось соединиться с первым Источником, то останавливаем
+                    else: # <- Если нет, то сформируем массив потоков и ниже его обработаем по факту завершения каждого из них
+                        stream.append(t)
+                if stream:
+                    for t in stream:
+                        t.join()
+                        parser(data, t.answer, addr[0], t.ip, False, t.error)
+        except:
+            pass
+        finally:
+            self.conn.close() # <- После всех операций закрываем соединение
 
 
     # -- Функция ответа        
