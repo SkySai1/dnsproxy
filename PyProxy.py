@@ -129,10 +129,13 @@ class TCP:
                 try:
                     self.tcp.listen(3) # <- количество безуспешных попыток подключится
                     self.conn, addr = self.tcp.accept() # <-Принятие запроса
+                    self.conn.settimeout(1) # <- лимит времени открытия соединения
                     data = self.conn.recv(32768) # <- Установка соединения и получения данных
                     if data: # <- При получении данных создаём отдельный поток и обрабатываем их
                         threading.Thread(target=TCP.handle, args=(self, data, addr)).start()
+                    self.conn.close() # <- закрытие соединения
                 except Exception as e:
+                    logging.exception('TCP TIMEOUT')
                     logger(str(e))
                     pass
         except Exception as e:
