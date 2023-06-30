@@ -183,7 +183,7 @@ class TCP:
             packet = True
             while True: # <- В рамках таймаута ждём получения пакетов, затем закрываем соединение, если ответ был большой мы его кастрариуем (и сломаем как следствие)
                 try:
-                    packet = s.recv(4096)
+                    packet = s.recv(65536)
                     answer+=packet
                 except socket.timeout: break # <- Закрываем соединение после таймаута
         except Exception as e:
