@@ -133,7 +133,7 @@ class TCP:
                     data = self.conn.recv(4096) # <- Установка соединения и получения данных
                     if data: # <- При получении данных создаём отдельный поток и обрабатываем их
                         threading.Thread(target=TCP.handle, args=(self, data, addr)).start()
-                    self.conn.close() # <- закрытие соединения
+                    #self.conn.close() # <- закрытие соединения
                 except Exception as e:
                     logging.exception('TCP')
                     logger(str(e))
