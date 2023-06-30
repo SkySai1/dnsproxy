@@ -6,7 +6,6 @@ import threading
 import os
 import subprocess
 import json
-import dns.message
 import ipaddress
 from datetime import datetime
 import time
