@@ -6,6 +6,7 @@ import threading
 import os
 import subprocess
 import json
+import dns.message
 import ipaddress
 from datetime import datetime
 import time
@@ -130,7 +131,7 @@ class TCP:
                     self.tcp.listen(3) # <- количество безуспешных попыток подключится
                     self.conn, addr = self.tcp.accept() # <-Принятие запроса
                     self.conn.settimeout(3) # <- лимит времени открытия соединения
-                    data = self.conn.recv(32768) # <- Установка соединения и получения данных
+                    data = self.conn.recv(4096) # <- Установка соединения и получения данных
                     if data: # <- При получении данных создаём отдельный поток и обрабатываем их
                         threading.Thread(target=TCP.handle, args=(self, data, addr)).start()
                     #self.conn.close() # <- закрытие соединения
@@ -173,18 +174,17 @@ class TCP:
     def query(data, addr):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # <- Сокет для оптравки TCP сообщений
         s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1) # <- Разрашаем использовать широковещание
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1) # <- Разрашаем переиспользовать сокет
-        s.settimeout(1) # <- Ставим таймаут на получения пакетов после отправки запроса
+        s.settimeout(0.2) # <- Ставим таймаут на получения пакетов после отправки запроса
         try:
             answer = b'' # <- Погдотвим, заранее, пустой ответ
             error = None
             s.connect(addr) # <- Подключаемся 
             s.sendall(data) # <- Отправляем запрос
-            packet = True
-            while True: # <- В рамках таймаута ждём получения пакетов, затем закрываем соединение, если ответ был большой мы его кастрариуем (и сломаем как следствие)
+            packet = s.recv(4096)
+            while packet: # <- В рамках таймаута ждём получения пакетов, затем закрываем соединение, если ответ был большой мы его кастрариуем (и сломаем как следствие)
                 try:
-                    packet = s.recv(65536)
                     answer+=packet
+                    packet = s.recv(4096)
                 except socket.timeout: break # <- Закрываем соединение после таймаута
         except Exception as e:
             logging.exception('TCP QUERY')
@@ -209,7 +209,11 @@ class AnswerThread(threading.Thread):
  
     def run(self):
         answer, error = self.proto.query(self.data, (self.ip, 53)) # <- Перенаправляем запрос в зависимости от протокола и получаем ответ
-        try: self.socket.sendto(answer, self.addr) # <- Возращаем инициатору ответ
+        print('a', len(answer))
+        try:
+            array = [answer[i:i+4096] for i in range(0, len(answer), 4096)] # <- Разбиваем большие данные на байтовые строки размеров по 4096 байт
+            for block in array:
+                self.socket.sendto(block, self.addr) # <- Возращаем порционно инициатору ответ
         except Exception as e: error = str(e)
         self.answer = answer
         self.error = error
@@ -322,8 +326,7 @@ if __name__ == "__main__":
             ipaddress.ip_address(ip)
         for ip in dest:
             try: ipaddress.ip_address(ip)
-            except: 
-                broadcast = ipaddress.ip_network(ip)
+            except: ipaddress.ip_network(ip)
     except:
         logging.exception('BAD CONFIG')
         sys.exit()
