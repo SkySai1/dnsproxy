@@ -174,7 +174,7 @@ class TCP:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # <- Сокет для оптравки TCP сообщений
         s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1) # <- Разрашаем использовать широковещание
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1) # <- Разрашаем переиспользовать сокет
-        s.settimeout(0.2) # <- Ставим таймаут на получения пакетов после отправки запроса
+        s.settimeout(1) # <- Ставим таймаут на получения пакетов после отправки запроса
         try:
             answer = b'' # <- Погдотвим, заранее, пустой ответ
             error = None
